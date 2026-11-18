@@ -1,5 +1,17 @@
 # nezuko-voip
 
+`nezuko-voip` متوافقة الآن مع محرك المكالمات الحقيقي داخل [`nezuko-baileys`](https://github.com/mzml-gg/nezuko-baileys)، وليست adapter لـ Baileys الرسمي.
+
+```bash
+npm install github:mzml-gg/nezuko-baileys github:mzml-gg/nezuko-voip
+```
+
+للمكالمات الفعلية استخدم `makeVoipClient` من `nezuko-baileys/voip` أو `createVoip` من هذه الحزمة.
+
+---
+
+# nezuko-voip
+
 مكتبة ESM صغيرة تعمل مع **`@whiskeysockets/baileys` الرسمي**. توفر adapter منظم لأحداث مكالمات WhatsApp الواردة، معرفة بيانات المكالمة، ورفضها من خلال `sock.rejectCall()`.
 
 ## مهم جداً

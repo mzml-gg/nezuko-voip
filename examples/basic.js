@@ -1,7 +1,6 @@
 import makeWASocket, {
-  DisconnectReason,
   useMultiFileAuthState
-} from '@whiskeysockets/baileys';
+} from 'nezuko-baileys';
 import { createVoip } from 'nezuko-voip';
 
 const { state, saveCreds } = await useMultiFileAuthState('./session');
@@ -12,18 +11,14 @@ const sock = makeWASocket({
 
 sock.ev.on('creds.update', saveCreds);
 
-const voip = createVoip(sock);
-voip.onIncoming(async (call) => {
-  console.log(`Incoming ${call.isVideo ? 'video' : 'audio'} call from ${call.from}`);
-  await voip.reject(call.callId, call.from);
-});
+sock.ev.on('connection.update', async ({ connection }) => {
+  if (connection !== 'open') return;
 
-sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
-  if (connection === 'open') console.log('WhatsApp connected.');
-  if (connection === 'close') {
-    const code = lastDisconnect?.error?.output?.statusCode;
-    if (code !== DisconnectReason.loggedOut) console.log('Connection closed.');
-  }
-});
+  const voip = createVoip(sock, { debug: false });
+  const call = await voip.call('201000000000', 'silence', undefined, {
+    durationMs: 120000
+  });
 
-await voip.listen();
+  call.on('connected', () => console.log('Call connected.'));
+  call.on('ended', (reason) => console.log('Call ended:', reason));
+});

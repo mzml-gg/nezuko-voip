@@ -16,25 +16,12 @@ test('factory aliases are exported', () => {
 });
 
 test('constructor validates the socket', () => {
-  assert.throws(() => createVoip(null), /Baileys socket with ev/);
+  assert.throws(() => createVoip(null), /connected nezuko-baileys socket/);
 });
 
-test('incoming call events can be observed and rejected', async () => {
-  const listeners = new Map();
-  const rejected = [];
-  const sock = {
-    ev: {
-      on(name, listener) { listeners.set(name, listener); },
-      off(name) { listeners.delete(name); }
-    },
-    async rejectCall(id, from) { rejected.push({ id, from }); }
-  };
-  const voip = createVoip(sock);
-  let received;
-  voip.onIncoming((call) => { received = call; });
-  listeners.get('call')([{ id: 'abc', from: '201000000000@s.whatsapp.net', status: 'offer', isVideo: false }]);
-  assert.equal(received.callId, 'abc');
-  await voip.reject('abc');
-  assert.deepEqual(rejected, [{ id: 'abc', from: '201000000000@s.whatsapp.net' }]);
+test('facade can be created around a Baileys-compatible socket', () => {
+  const voip = createVoip({ ws: { on() {}, off() {} } });
+  assert.equal(voip.raw, null);
+  assert.deepEqual(voip.activeCalls(), []);
   voip.close();
 });

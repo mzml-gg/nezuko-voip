@@ -1,7 +1,7 @@
 {
   "name": "nezuko-voip",
-  "version": "1.1.0",
-  "description": "Official Baileys call-event and reject-call helper for WhatsApp bots.",
+  "version": "2.0.0",
+  "description": "VoIP facade backed by nezuko-baileys for WhatsApp bots.",
   "type": "module",
   "main": "./src/index.js",
   "module": "./src/index.js",
@@ -13,17 +13,42 @@
       "default": "./src/index.js"
     }
   },
-  "files": ["src", "examples", "README.md", "LICENSE"],
+  "files": [
+    "src",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test",
     "smoke": "node examples/smoke.js",
     "pack:check": "npm pack --dry-run"
   },
-  "keywords": ["whatsapp", "baileys", "voip", "call", "whatsapp-bot", "esm"],
-  "engines": { "node": ">=20.0.0" },
-  "repository": { "type": "git", "url": "https://github.com/mzml-gg/nezuko-voip.git" },
-  "bugs": { "url": "https://github.com/mzml-gg/nezuko-voip/issues" },
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "voip",
+    "call",
+    "whatsapp-bot",
+    "esm"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mzml-gg/nezuko-voip.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mzml-gg/nezuko-voip/issues"
+  },
   "homepage": "https://github.com/mzml-gg/nezuko-voip#readme",
   "license": "MIT",
-  "dependencies": { "@whiskeysockets/baileys": "^7.0.0-rc14" }
+  "dependencies": {
+    "nezuko-baileys": "github:mzml-gg/nezuko-baileys#v1.0.0"
+  },
+  "x-compatibility": {
+    "baileys": "nezuko-baileys@v1.0.0",
+    "voip": "nezuko-baileys/voip"
+  }
 }

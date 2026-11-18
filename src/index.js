@@ -1,4 +1,7 @@
 import { EventEmitter } from 'node:events';
+import { makeVoipClient, VoipClient, ActiveCall } from 'nezuko-baileys/voip';
+
+export { VoipClient, ActiveCall, makeVoipClient } from 'nezuko-baileys/voip';
 
 export function toJid(value) {
   const raw = String(value ?? '').trim();
@@ -16,146 +19,131 @@ export function normalizeTargets(targets) {
 
 export const RESOLUTIONS = Object.freeze(['240p', '360p', '480p', '720p', '1080p']);
 
-const UNSUPPORTED = 'The official @whiskeysockets/baileys package exposes call events and rejectCall(), but does not expose a public VoIP media engine for outgoing calls or answering calls.';
+const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|mkv|avi|m4v|3gp)(?:\?|#|$)/i;
 
-function unsupported(method) {
-  throw new Error(`${method} is not available with @whiskeysockets/baileys. ${UNSUPPORTED}`);
-}
-
-function normalizeIncoming(call) {
-  return {
-    ...call,
-    id: String(call.id),
-    callId: String(call.id),
-    jid: call.from,
-    from: call.callerPn || call.from,
-    canAccept: false,
-    isVideo: Boolean(call.isVideo),
-    isGroup: Boolean(call.isGroup)
-  };
+function mediaOptions(media, options = {}) {
+  if (media && typeof media === 'object' && !Array.isArray(media)) {
+    return { ...media, ...options };
+  }
+  const items = Array.isArray(media) ? media.filter(Boolean) : [media ?? 'silence'];
+  const first = items[0] ?? 'silence';
+  const result = { ...options };
+  if (items.length > 1) result.playlist = items;
+  else if (VIDEO_EXTENSIONS.test(String(first))) {
+    result.video = true;
+    result.videoSource = first;
+  } else {
+    result.audioSource = first;
+  }
+  return result;
 }
 
 /**
- * Official-Baileys call adapter.
- *
- * It intentionally implements only APIs exposed by @whiskeysockets/baileys:
- * listening to `call` events and rejecting an incoming call.
+ * High-level compatibility facade backed by nezuko-baileys' real VoIP engine.
  */
 export class NezukoVoip extends EventEmitter {
-  #offers = new Map();
-  #listeners = new Set();
-  #boundCall;
+  #client = null;
+  #connecting = null;
 
-  constructor(sock) {
+  constructor(sock, options = {}) {
     super();
-    if (!sock || typeof sock !== 'object' || !sock.ev?.on) {
-      throw new TypeError('NezukoVoip requires a Baileys socket with ev.on().');
-    }
-    if (typeof sock.rejectCall !== 'function') {
-      throw new TypeError('The provided socket does not expose rejectCall(). Use @whiskeysockets/baileys.');
+    if (!sock || typeof sock !== 'object') {
+      throw new TypeError('NezukoVoip requires a connected nezuko-baileys socket.');
     }
     this.sock = sock;
-    this.#boundCall = (updates) => {
-      for (const call of Array.isArray(updates) ? updates : [updates]) {
-        if (!call?.id) continue;
-        if (['reject', 'accept', 'timeout', 'terminate'].includes(call.status)) {
-          this.#offers.delete(String(call.id));
-        } else if (call.status === 'offer') {
-          this.#offers.set(String(call.id), call);
-        }
-        const info = normalizeIncoming(call);
-        this.emit('call', info);
-        for (const listener of this.#listeners) listener(info);
-      }
-    };
-    sock.ev.on('call', this.#boundCall);
+    this.options = { ...options };
   }
 
-  get raw() {
-    return this.sock;
-  }
-
-  get calls() {
-    return this.activeCalls();
-  }
-
-  get coordinator() {
-    return null;
-  }
+  get raw() { return this.#client; }
+  get calls() { return this.#client?._activeCall ? [this.#client._activeCall] : []; }
+  get coordinator() { return this.#client; }
 
   async listen() {
+    if (!this.#client) {
+      if (!this.#connecting) {
+        this.#connecting = makeVoipClient(this.sock, this.options).then((client) => {
+          this.#client = client;
+          return client;
+        }).finally(() => { this.#connecting = null; });
+      }
+      await this.#connecting;
+    }
     return this;
   }
 
-  incoming() {
-    return [...this.#offers.values()].map(normalizeIncoming).filter((call) => call.status === 'offer');
+  async #ready() {
+    await this.listen();
+    return this.#client;
   }
 
-  onIncoming(listener) {
-    if (typeof listener !== 'function') throw new TypeError('listener must be a function.');
-    this.#listeners.add(listener);
-    return () => this.#listeners.delete(listener);
+  async call(target, media = 'silence', resolution, options = {}) {
+    const client = await this.#ready();
+    const call = await client.call(String(target).replace(/\D/g, ''), mediaOptions(media, options));
+    this.emit('call', call);
+    return call;
   }
 
-  async reject(callId, callFrom) {
-    const id = String(callId);
-    const cached = this.#offers.get(id);
-    const from = callFrom || cached?.from || cached?.callerPn;
-    if (!from) {
-      throw new TypeError('callFrom is required when the call is not present in the incoming-call cache.');
-    }
-    await this.sock.rejectCall(id, from);
-    this.#offers.delete(id);
+  async callMany(targets, media = 'silence', resolution, options = {}) {
+    const list = normalizeTargets(targets);
+    const settled = await Promise.allSettled(list.map((jid) => this.call(jid, media, resolution, options)));
+    return settled.map((result, index) => result.status === 'fulfilled'
+      ? { jid: list[index], call: result.value }
+      : { jid: list[index], error: result.reason });
   }
 
-  async rejectCall(callId, callFrom) {
-    return this.reject(callId, callFrom);
+  async groupCall(groupJid, media = 'silence', resolution, options = {}) {
+    const client = await this.#ready();
+    const jid = String(groupJid).includes('@') ? String(groupJid) : `${groupJid}@g.us`;
+    return client.callGroup(jid, mediaOptions(media, options));
   }
 
-  async call() { return unsupported('call()'); }
-  async callMany() { return unsupported('callMany()'); }
-  async groupCall() { return unsupported('groupCall()'); }
-  async accept() { return unsupported('accept()'); }
-  async hangup() { return unsupported('hangup()'); }
-  async createRoom() { return unsupported('createRoom()'); }
-  async joinLink() { return unsupported('joinLink()'); }
-  async previewLink() { return unsupported('previewLink()'); }
-  mute() { return unsupported('mute()'); }
-  silent() { return unsupported('silent()'); }
-  react() { return unsupported('react()'); }
-  hand() { return unsupported('hand()'); }
-  add() { return unsupported('add()'); }
-  link() { return unsupported('link()'); }
+  async accept(isMicEnabled = true) {
+    const client = await this.#ready();
+    return client.acceptCall(isMicEnabled);
+  }
+
+  async acceptCall(isMicEnabled = true) {
+    return this.accept(isMicEnabled);
+  }
+
+  async hangup() {
+    const client = await this.#ready();
+    return client._activeCall?.end();
+  }
+
+  async end() { return this.hangup(); }
 
   activeCalls() {
-    return this.incoming().map((call) => ({
-      id: call.callId,
-      kind: call.isGroup ? 'group' : 'direct',
-      connected: false,
-      ended: false,
-      from: call.from,
-      isVideo: call.isVideo
-    }));
+    const call = this.#client?._activeCall;
+    return call ? [{ id: call.callId, state: call.state, ended: false }] : [];
   }
 
-  info(callId) {
-    const call = this.#offers.get(String(callId));
-    return call ? normalizeIncoming(call) : null;
+  info() {
+    const call = this.#client?._activeCall;
+    return call ? { id: call.callId, state: call.state, isVideo: call.isVideo?.() ?? false } : null;
   }
 
-  async end() {
-    return unsupported('end()');
+  mute(value = true) {
+    return this.#client?._activeCall?.mute(value);
   }
 
-  close() {
-    this.sock.ev.off?.('call', this.#boundCall);
-    this.#listeners.clear();
-    this.#offers.clear();
+  play(source) { return this.#client?._activeCall?.play(source) ?? false; }
+  enqueue(source) { return this.#client?._activeCall?.enqueue(source) ?? 0; }
+  skip() { return this.#client?._activeCall?.skip() ?? false; }
+  playVideo(source) { return this.#client?._activeCall?.playVideo(source) ?? false; }
+  enqueueVideo(source) { return this.#client?._activeCall?.enqueueVideo(source) ?? 0; }
+  skipVideo() { return this.#client?._activeCall?.skipVideo() ?? false; }
+
+  disconnect() {
+    this.#client?.disconnect();
+    this.#client = null;
   }
+
+  close() { this.disconnect(); }
 }
 
-export function createVoip(sock) {
-  return new NezukoVoip(sock);
+export function createVoip(sock, options = {}) {
+  return new NezukoVoip(sock, options);
 }
 
 export const createNezukoVoip = createVoip;
