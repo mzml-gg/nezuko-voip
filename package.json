@@ -1,0 +1,50 @@
+{
+  "name": "nezuko-voip",
+  "version": "1.0.0",
+  "description": "A clean ESM VoIP helper for WhatsApp bots built on Baileys Lite.",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "smoke": "node examples/smoke.js",
+    "pack:check": "npm pack --dry-run"
+  },
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "voip",
+    "call",
+    "whatsapp-bot",
+    "esm"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mzml-gg/nezuko-voip.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mzml-gg/nezuko-voip/issues"
+  },
+  "homepage": "https://github.com/mzml-gg/nezuko-voip#readme",
+  "license": "MIT",
+  "dependencies": {
+    "@hiroosy/baileys-lite": "^0.4.0"
+  }
+}
