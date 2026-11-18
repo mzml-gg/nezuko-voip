@@ -1,44 +1,41 @@
-export type MediaSource = string | URL | { source: string; kind?: 'audio' | 'video' };
-export type Resolution = '240p' | '360p' | '480p' | '720p' | '1080p' | { width: number; height: number; frameRate?: number };
-export type VoipOptions = { maxConcurrentCalls?: number; voipLogLevel?: string; level?: string; ffprobePath?: string; tmpDir?: string };
-export type CallOptions = { loop?: boolean; autoEndCall?: boolean; autoDowngrade?: boolean; safetyMs?: number; startVideoOnFirst?: boolean };
-export type IncomingCall = { id: string; callId: string; from: string; jid: string; creator?: string; isVideo: boolean; isGroup: boolean; canAccept: boolean; info: unknown };
+export type OfficialCall = {
+  id: string;
+  callId: string;
+  from: string;
+  jid: string;
+  callerPn?: string;
+  isVideo: boolean;
+  isGroup: boolean;
+  status: string;
+  canAccept: false;
+  [key: string]: unknown;
+};
 
 export declare function toJid(value: string | number): string;
 export declare function normalizeTargets(targets: string | number | Array<string | number>): string[];
 export declare const RESOLUTIONS: readonly ['240p', '360p', '480p', '720p', '1080p'];
 
 export declare class NezukoVoip {
-  constructor(sock: object, options?: VoipOptions);
+  constructor(sock: { ev: { on(event: string, listener: Function): unknown; off?: Function }; rejectCall(callId: string, callFrom: string): Promise<void> });
   readonly sock: object;
-  readonly options: VoipOptions;
   readonly raw: object;
   readonly calls: object[];
-  readonly coordinator: object | null;
+  readonly coordinator: null;
+  readonly activeCalls: object[];
   listen(): Promise<this>;
-  call(target: string | number, media?: MediaSource | MediaSource[], resolution?: Resolution, options?: CallOptions): Promise<object>;
-  callMany(targets: Array<string | number>, media?: MediaSource | MediaSource[], resolution?: Resolution, options?: CallOptions): Promise<object[]>;
-  groupCall(targets: Array<string | number>, media?: MediaSource | MediaSource[], resolution?: Resolution, options?: CallOptions): Promise<object>;
-  incoming(): IncomingCall[];
-  onIncoming(listener: (info: IncomingCall) => void): () => void;
-  accept(callId: string, media?: MediaSource | MediaSource[], resolution?: Resolution, options?: CallOptions): Promise<object>;
-  reject(callId: string, reason?: unknown): Promise<unknown>;
-  hangup(callId: string): Promise<unknown>;
-  createRoom(media?: MediaSource | MediaSource[], resolution?: Resolution, options?: CallOptions): Promise<object>;
-  joinLink(link: string, media?: MediaSource | MediaSource[], resolution?: Resolution, options?: CallOptions): Promise<object>;
-  previewLink(link: string, options?: { isVideo?: boolean }): Promise<object>;
-  activeCalls(): object[];
-  info(callId: string): object | null;
-  mute(callId: string, value?: boolean): Promise<unknown>;
-  silent(callId: string, value?: boolean): Promise<unknown>;
-  react(callId: string, emoji: string): Promise<unknown>;
-  hand(callId: string, value?: boolean): Promise<unknown>;
-  add(callId: string, target: string | number): Promise<unknown>;
-  link(callId: string): string | null;
-  end(target?: string | boolean): Promise<unknown>;
+  incoming(): OfficialCall[];
+  onIncoming(listener: (info: OfficialCall) => void): () => void;
+  reject(callId: string, callFrom?: string): Promise<void>;
+  rejectCall(callId: string, callFrom?: string): Promise<void>;
+  info(callId: string): OfficialCall | null;
   close(): void;
+  call(...args: unknown[]): Promise<never>;
+  callMany(...args: unknown[]): Promise<never>;
+  groupCall(...args: unknown[]): Promise<never>;
+  accept(...args: unknown[]): Promise<never>;
+  hangup(...args: unknown[]): Promise<never>;
 }
 
-export declare function createVoip(sock: object, options?: VoipOptions): NezukoVoip;
+export declare function createVoip(sock: ConstructorParameters<typeof NezukoVoip>[0]): NezukoVoip;
 export declare const createNezukoVoip: typeof createVoip;
 export default NezukoVoip;

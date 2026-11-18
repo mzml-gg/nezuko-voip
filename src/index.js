@@ -1,10 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { Voip as BaileysVoip } from '@hiroosy/baileys-lite/voip';
 
-/**
- * Convert a phone number or WhatsApp JID into a bare WhatsApp user JID.
- * Existing JIDs are preserved, including group JIDs and LIDs.
- */
 export function toJid(value) {
   const raw = String(value ?? '').trim();
   if (!raw) throw new TypeError('A phone number or WhatsApp JID is required.');
@@ -21,132 +16,146 @@ export function normalizeTargets(targets) {
 
 export const RESOLUTIONS = Object.freeze(['240p', '360p', '480p', '720p', '1080p']);
 
+const UNSUPPORTED = 'The official @whiskeysockets/baileys package exposes call events and rejectCall(), but does not expose a public VoIP media engine for outgoing calls or answering calls.';
+
+function unsupported(method) {
+  throw new Error(`${method} is not available with @whiskeysockets/baileys. ${UNSUPPORTED}`);
+}
+
+function normalizeIncoming(call) {
+  return {
+    ...call,
+    id: String(call.id),
+    callId: String(call.id),
+    jid: call.from,
+    from: call.callerPn || call.from,
+    canAccept: false,
+    isVideo: Boolean(call.isVideo),
+    isGroup: Boolean(call.isGroup)
+  };
+}
+
 /**
- * High-level VoIP facade for a connected @hiroosy/baileys-lite socket.
- * The socket must be created and authenticated by the application.
+ * Official-Baileys call adapter.
+ *
+ * It intentionally implements only APIs exposed by @whiskeysockets/baileys:
+ * listening to `call` events and rejecting an incoming call.
  */
 export class NezukoVoip extends EventEmitter {
-  #voip;
-  #incomingUnsubscribe = null;
+  #offers = new Map();
+  #listeners = new Set();
+  #boundCall;
 
-  constructor(sock, options = {}) {
+  constructor(sock) {
     super();
-    if (!sock || typeof sock !== 'object') {
-      throw new TypeError('NezukoVoip requires a connected Baileys socket.');
+    if (!sock || typeof sock !== 'object' || !sock.ev?.on) {
+      throw new TypeError('NezukoVoip requires a Baileys socket with ev.on().');
+    }
+    if (typeof sock.rejectCall !== 'function') {
+      throw new TypeError('The provided socket does not expose rejectCall(). Use @whiskeysockets/baileys.');
     }
     this.sock = sock;
-    this.options = { ...options };
-    this.#voip = new BaileysVoip(sock, options);
+    this.#boundCall = (updates) => {
+      for (const call of Array.isArray(updates) ? updates : [updates]) {
+        if (!call?.id) continue;
+        if (['reject', 'accept', 'timeout', 'terminate'].includes(call.status)) {
+          this.#offers.delete(String(call.id));
+        } else if (call.status === 'offer') {
+          this.#offers.set(String(call.id), call);
+        }
+        const info = normalizeIncoming(call);
+        this.emit('call', info);
+        for (const listener of this.#listeners) listener(info);
+      }
+    };
+    sock.ev.on('call', this.#boundCall);
   }
 
   get raw() {
-    return this.#voip;
+    return this.sock;
   }
 
   get calls() {
-    return this.#voip.calls;
+    return this.activeCalls();
   }
 
   get coordinator() {
-    return this.#voip.coordinator;
+    return null;
   }
 
   async listen() {
-    await this.#voip.listen();
     return this;
   }
 
-  async call(target, media = 'silence', resolution, options = {}) {
-    return this.#voip.call(toJid(target), media, resolution, options);
-  }
-
-  async callMany(targets, media = 'silence', resolution, options = {}) {
-    return this.#voip.callMany(normalizeTargets(targets), media, resolution, options);
-  }
-
-  async groupCall(targets, media = 'silence', resolution, options = {}) {
-    return this.#voip.groupCall(normalizeTargets(targets), media, resolution, options);
-  }
-
   incoming() {
-    return this.#voip.incoming();
+    return [...this.#offers.values()].map(normalizeIncoming).filter((call) => call.status === 'offer');
   }
 
   onIncoming(listener) {
     if (typeof listener !== 'function') throw new TypeError('listener must be a function.');
-    const unsubscribe = this.#voip.onIncoming((info) => listener(info));
-    this.#incomingUnsubscribe = unsubscribe;
-    return unsubscribe;
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
-  async accept(callId, media = 'silence', resolution, options = {}) {
-    return this.#voip.accept(callId, media, resolution, options);
+  async reject(callId, callFrom) {
+    const id = String(callId);
+    const cached = this.#offers.get(id);
+    const from = callFrom || cached?.from || cached?.callerPn;
+    if (!from) {
+      throw new TypeError('callFrom is required when the call is not present in the incoming-call cache.');
+    }
+    await this.sock.rejectCall(id, from);
+    this.#offers.delete(id);
   }
 
-  async reject(callId, reason) {
-    return this.#voip.reject(callId, reason);
+  async rejectCall(callId, callFrom) {
+    return this.reject(callId, callFrom);
   }
 
-  async hangup(callId) {
-    return this.#voip.hangup(callId);
-  }
-
-  async createRoom(media = 'silence', resolution, options = {}) {
-    return this.#voip.createRoom(media, resolution, options);
-  }
-
-  async joinLink(link, media = 'silence', resolution, options = {}) {
-    return this.#voip.joinLink(link, media, resolution, options);
-  }
-
-  async previewLink(link, options = {}) {
-    return this.#voip.previewLink(link, options);
-  }
+  async call() { return unsupported('call()'); }
+  async callMany() { return unsupported('callMany()'); }
+  async groupCall() { return unsupported('groupCall()'); }
+  async accept() { return unsupported('accept()'); }
+  async hangup() { return unsupported('hangup()'); }
+  async createRoom() { return unsupported('createRoom()'); }
+  async joinLink() { return unsupported('joinLink()'); }
+  async previewLink() { return unsupported('previewLink()'); }
+  mute() { return unsupported('mute()'); }
+  silent() { return unsupported('silent()'); }
+  react() { return unsupported('react()'); }
+  hand() { return unsupported('hand()'); }
+  add() { return unsupported('add()'); }
+  link() { return unsupported('link()'); }
 
   activeCalls() {
-    return this.#voip.activeCalls();
+    return this.incoming().map((call) => ({
+      id: call.callId,
+      kind: call.isGroup ? 'group' : 'direct',
+      connected: false,
+      ended: false,
+      from: call.from,
+      isVideo: call.isVideo
+    }));
   }
 
   info(callId) {
-    return this.#voip.info(callId);
+    const call = this.#offers.get(String(callId));
+    return call ? normalizeIncoming(call) : null;
   }
 
-  mute(callId, value = true) {
-    return this.#voip.mute(callId, value);
-  }
-
-  silent(callId, value) {
-    return this.#voip.silent(callId, value);
-  }
-
-  react(callId, emoji) {
-    return this.#voip.react(callId, emoji);
-  }
-
-  hand(callId, value = true) {
-    return this.#voip.hand(callId, value);
-  }
-
-  add(callId, target) {
-    return this.#voip.add(callId, toJid(target));
-  }
-
-  link(callId) {
-    return this.#voip.link(callId);
-  }
-
-  async end(target = false) {
-    return this.#voip.end(target);
+  async end() {
+    return unsupported('end()');
   }
 
   close() {
-    this.#incomingUnsubscribe?.();
-    this.#incomingUnsubscribe = null;
+    this.sock.ev.off?.('call', this.#boundCall);
+    this.#listeners.clear();
+    this.#offers.clear();
   }
 }
 
-export function createVoip(sock, options = {}) {
-  return new NezukoVoip(sock, options);
+export function createVoip(sock) {
+  return new NezukoVoip(sock);
 }
 
 export const createNezukoVoip = createVoip;
