@@ -1,12 +1,12 @@
 # nezuko-voip
 
-`nezuko-voip` متوافقة الآن مع محرك المكالمات الحقيقي داخل [`nezuko-baileys`](https://github.com/mzml-gg/nezuko-baileys)، وليست adapter لـ Baileys الرسمي.
+`nezuko-voip` متوافقة الآن مع محرك المكالمات الحقيقي من فورك Nezuko، لكنه يُثبت داخل المشروع تحت مسار الاستيراد القياسي `@whiskeysockets/baileys` حتى لا يبحث الكود عن حزمة باسم مختلف.
 
 ```bash
-npm install github:mzml-gg/nezuko-baileys github:mzml-gg/nezuko-voip
+npm install github:mzml-gg/nezuko-voip
 ```
 
-للمكالمات الفعلية استخدم `makeVoipClient` من `nezuko-baileys/voip` أو `createVoip` من هذه الحزمة.
+للمكالمات الفعلية استخدم `makeVoipClient` من `@whiskeysockets/baileys/voip` أو `createVoip` من هذه الحزمة. فورك Nezuko يُثبت تلقائياً خلف هذا المسار من GitHub.
 
 ---
 

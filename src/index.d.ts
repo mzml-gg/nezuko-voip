@@ -1,4 +1,4 @@
-import type { ActiveCall, VoipCallOptions, VoipClient, VoipClientOptions, VoipGroupCallOptions } from 'nezuko-baileys/voip';
+import type { ActiveCall, VoipCallOptions, VoipClient, VoipClientOptions, VoipGroupCallOptions } from '@whiskeysockets/baileys/voip';
 
 export { ActiveCall, VoipClient, VoipCallOptions, VoipClientOptions, VoipGroupCallOptions };
 export declare const makeVoipClient: (socket: object, config?: VoipClientOptions) => Promise<VoipClient>;

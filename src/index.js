@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
-import { makeVoipClient, VoipClient, ActiveCall } from 'nezuko-baileys/voip';
+import { makeVoipClient, VoipClient, ActiveCall } from '@whiskeysockets/baileys/voip';
 
-export { VoipClient, ActiveCall, makeVoipClient } from 'nezuko-baileys/voip';
+export { VoipClient, ActiveCall, makeVoipClient } from '@whiskeysockets/baileys/voip';
 
 export function toJid(value) {
   const raw = String(value ?? '').trim();
@@ -39,7 +39,8 @@ function mediaOptions(media, options = {}) {
 }
 
 /**
- * High-level compatibility facade backed by nezuko-baileys' real VoIP engine.
+ * High-level compatibility facade backed by the Nezuko VoIP fork installed
+ * under the canonical @whiskeysockets/baileys package path.
  */
 export class NezukoVoip extends EventEmitter {
   #client = null;
@@ -48,7 +49,7 @@ export class NezukoVoip extends EventEmitter {
   constructor(sock, options = {}) {
     super();
     if (!sock || typeof sock !== 'object') {
-      throw new TypeError('NezukoVoip requires a connected nezuko-baileys socket.');
+      throw new TypeError('NezukoVoip requires a connected @whiskeysockets/baileys socket.');
     }
     this.sock = sock;
     this.options = { ...options };
@@ -102,15 +103,8 @@ export class NezukoVoip extends EventEmitter {
     return client.acceptCall(isMicEnabled);
   }
 
-  async acceptCall(isMicEnabled = true) {
-    return this.accept(isMicEnabled);
-  }
-
-  async hangup() {
-    const client = await this.#ready();
-    return client._activeCall?.end();
-  }
-
+  async acceptCall(isMicEnabled = true) { return this.accept(isMicEnabled); }
+  async hangup() { const client = await this.#ready(); return client._activeCall?.end(); }
   async end() { return this.hangup(); }
 
   activeCalls() {
@@ -123,28 +117,17 @@ export class NezukoVoip extends EventEmitter {
     return call ? { id: call.callId, state: call.state, isVideo: call.isVideo?.() ?? false } : null;
   }
 
-  mute(value = true) {
-    return this.#client?._activeCall?.mute(value);
-  }
-
+  mute(value = true) { return this.#client?._activeCall?.mute(value); }
   play(source) { return this.#client?._activeCall?.play(source) ?? false; }
   enqueue(source) { return this.#client?._activeCall?.enqueue(source) ?? 0; }
   skip() { return this.#client?._activeCall?.skip() ?? false; }
   playVideo(source) { return this.#client?._activeCall?.playVideo(source) ?? false; }
   enqueueVideo(source) { return this.#client?._activeCall?.enqueueVideo(source) ?? 0; }
   skipVideo() { return this.#client?._activeCall?.skipVideo() ?? false; }
-
-  disconnect() {
-    this.#client?.disconnect();
-    this.#client = null;
-  }
-
+  disconnect() { this.#client?.disconnect(); this.#client = null; }
   close() { this.disconnect(); }
 }
 
-export function createVoip(sock, options = {}) {
-  return new NezukoVoip(sock, options);
-}
-
+export function createVoip(sock, options = {}) { return new NezukoVoip(sock, options); }
 export const createNezukoVoip = createVoip;
 export default NezukoVoip;

@@ -16,7 +16,7 @@ test('factory aliases are exported', () => {
 });
 
 test('constructor validates the socket', () => {
-  assert.throws(() => createVoip(null), /connected nezuko-baileys socket/);
+  assert.throws(() => createVoip(null), /@whiskeysockets\/baileys socket/);
 });
 
 test('facade can be created around a Baileys-compatible socket', () => {

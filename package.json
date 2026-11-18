@@ -1,6 +1,6 @@
 {
   "name": "nezuko-voip",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "VoIP facade backed by nezuko-baileys for WhatsApp bots.",
   "type": "module",
   "main": "./src/index.js",
@@ -45,10 +45,11 @@
   "homepage": "https://github.com/mzml-gg/nezuko-voip#readme",
   "license": "MIT",
   "dependencies": {
-    "nezuko-baileys": "github:mzml-gg/nezuko-baileys#v1.0.0"
+    "@whiskeysockets/baileys": "github:mzml-gg/nezuko-baileys#v1.0.2"
   },
   "x-compatibility": {
-    "baileys": "nezuko-baileys@v1.0.0",
-    "voip": "nezuko-baileys/voip"
+    "canonicalImport": "@whiskeysockets/baileys",
+    "implementation": "github:mzml-gg/nezuko-baileys#v1.0.2",
+    "voipImport": "@whiskeysockets/baileys/voip"
   }
 }
